@@ -5,9 +5,11 @@
 .hg*
 .idea
 package-lock.json
+npm-debug.log
 bower_components
 main/index.yaml
 main/lib
+main/libx
 main/lib.zip
 main/static/dev
 main/static/ext

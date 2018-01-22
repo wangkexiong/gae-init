@@ -175,41 +175,56 @@ def install_py_libs():
   exclude_warning_ext = ('.so', '.pyd')
   exclude = (
     'test', 'tests', 'pip', 'setuptools', '_markerlib', 'PIL', 'lxml',
-    'easy_install.py', 'pkg_resources', 'pkg_resources.py', 'wheel'
+    'easy_install.py', 'pkg_resources', 'pkg_resources.py', 'wheel', '__pycache__'
   )
-
-  site_packages = site_packages_path()
-
-  def _exclude_files(directory, names):
-    result = []
-
-    if os.path.normpath(directory) == os.path.normpath(site_packages):
-      for name in names:
-        if name in exclude or name.startswith(exclude_prefix) or name.endswith(exclude_ext):
-          result.append(name)
-        elif name.endswith(exclude_warning_ext):
-          print_out('GAE DOES not support binary extensions - ', name)
-          result.append(name)
-        elif os.path.isdir(os.path.join(directory, name)):
-          check_list = []
-          for _, _, files in os.walk(os.path.join(directory, name)):
-            check_list.extend(files)
-
-          for x in check_list:
-            if x.endswith(exclude_warning_ext):
-              print_out('GAE DOES not support binary extensions, SKIP module - ', name)
-              result.append(name)
-              break
-    else:
-      for name in names:
-        if name.endswith('.pyc'):
-          result.append(name)
-
-    return result
 
   if os.path.exists(DIR_LIB):
     shutil.rmtree(DIR_LIB)
-  shutil.copytree(site_packages, DIR_LIB, ignore=_exclude_files)
+  if os.path.exists(DIR_LIBX):
+    shutil.rmtree(DIR_LIBX)
+
+  def _exclude_files(directory, names):
+    result = []
+    for name in names:
+      if name.endswith('.pyc'):
+        result.append(name)
+    return result
+
+  site_packages = site_packages_path()
+  for name in os.listdir(site_packages):
+    under_check = os.path.join(site_packages, name)
+    if name in exclude or name.startswith(exclude_prefix) or name.endswith(exclude_ext):
+      continue
+    elif name.endswith(exclude_warning_ext):
+      print_out('GAE DOES not support binary extensions - ', name)
+      continue
+    elif os.path.isdir(under_check):
+      next_step = 'COPY_LIB'             # COPY_LIB/COPY_LIBX/SKIP
+      check_list = []
+      for _, _, files in os.walk(under_check):
+        check_list.extend(files)
+
+      for x in check_list:
+        if x.endswith(exclude_warning_ext):
+          print_out('GAE DOES not support binary extensions, SKIP module - ', name)
+          next_step = 'SKIP'
+          break
+        elif not x.endswith('.py') and not x.endswith('.pyc'):
+          next_step = 'COPY_LIBX'
+          break
+
+      if next_step == 'SKIP':
+        continue
+      elif next_step == 'COPY_LIB':
+        shutil.copytree(under_check, os.path.join(DIR_LIB, name), ignore=_exclude_files)
+      else:
+        shutil.copytree(under_check, os.path.join(DIR_LIBX, name), ignore=_exclude_files)
+    else:
+      if name.endswith('.py'):
+        shutil.copy(under_check, DIR_LIB)
+      else:
+        shutil.copy(under_check, DIR_LIBX)
+
   make_guard(FILE_PIP_GUARD, 'pip', FILE_REQUIREMENTS)
 
 
